@@ -8,11 +8,15 @@ var https = require("node-fetch");
 
 var app = express();
 app.use(cookieParser());
-app.use(cors());
+app.use(cors({ 
+  origin: 'http://localhost:4200', 
+  credentials: true, 
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  optionsSuccessStatus: 200
+ }));
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
 
 const ROOT_URL = "https://hacker-news.firebaseio.com/v0/";
 
@@ -22,7 +26,7 @@ var votes = {};
 https(ROOT_URL + "topstories.json?print=pretty")
   .then((res) => res.json())
   .then((ids) => {
-    ids.slice(0, 20).forEach((id) => {
+    ids.forEach((id) => {
       https(ROOT_URL + `item/${id}.json?print=pretty`)
         .then((res) => res.json())
         .then((story) => {
@@ -37,19 +41,26 @@ https(ROOT_URL + "topstories.json?print=pretty")
   .catch((err) => {
     console.log(err);
   });
+   
+   app.get('/products/:id', function (req, res, next) {
+    res.json({msg: 'This is CORS-enabled for all origins!'})
+  })
 
-var corsOptions = {
-  origin: "http://localhost:4200",
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  credentials: true,
-  optionsSuccessStatus: 200, // some legacy browsers (IE11, various SmartTVs) choke on 204
-};
+  
+app.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "http://localhost:4200");
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
+  res.header("Access-Control-Allow-Headers", "application/x-www-form-urlencoded, multipart/form-data, text/plain, Origin, X-Requested-With, Content-Type, Accept, Cache-Control");
+  res.header("Access-Control-Allow-Credentials", true);
 
-app.use(function(req, res, next) {  
-    res.header('Access-Control-Allow-Origin', "http://localhost:4200");
-    res.header("Access-Control-Allow-Headers", "Cookie, Origin, X-Requested-With, Content-Type, Accept");
+  // intercept OPTIONS method
+  if ('OPTIONS' == req.method) {
+    res.send(200);
+  }
+  else {
     next();
-});  
+  }
+});
 
 app.use(function (req, res, next) {
   // check if client sent cookie
@@ -69,15 +80,15 @@ app.use(function (req, res, next) {
 });
 
 /* GET home page. */
-app.get("/topstories.json", cors(corsOptions), function (req, res, next) {
+app.get("/topstories.json", function (req, res, next) {
   res.send(Object.keys(topstories));
 });
 
-app.get("/item/:id.json", cors(corsOptions), function (req, res, next) {
+app.get("/item/:id.json", function (req, res, next) {
   res.send(topstories[req.params.id]);
 });
 
-app.get("/item/:id/upvote", cors(corsOptions), (req, res) => {
+app.get("/item/:id/upvote", (req, res) => {
   console.log(req.cookies);
   var cookie = req.cookies.voterID;
   var users = votes[req.params.id] !== undefined ? votes[req.params.id] : {};
@@ -86,7 +97,7 @@ app.get("/item/:id/upvote", cors(corsOptions), (req, res) => {
   res.send();
 });
 
-app.get("/item/:id/downvote", cors(corsOptions), (req, res) => {
+app.get("/item/:id/downvote", (req, res) => {
   var cookie = req.cookies.voterID;
   var users = votes[req.params.id] !== undefined ? votes[req.params.id] : {};
   users[cookie] = -1;
@@ -94,7 +105,7 @@ app.get("/item/:id/downvote", cors(corsOptions), (req, res) => {
   res.send();
 });
 
-app.get("/item/:id/resetvote", cors(corsOptions), (req, res) => {
+app.get("/item/:id/resetvote", (req, res) => {
   var cookie = req.cookies.voterID;
   var users = votes[req.params.id] !== undefined ? votes[req.params.id] : {};
   users[cookie] = undefined;
@@ -102,23 +113,24 @@ app.get("/item/:id/resetvote", cors(corsOptions), (req, res) => {
   res.send();
 });
 
-app.get("/votes", cors(corsOptions), (req, res) => {
+app.get("/votes", (req, res) => {
   res.send(votes);
   console.log(req.cookies);
 });
 
-app.post("/votes", cors(corsOptions), (req, res) => {
+app.post("/votes", cors({ origin: "http://localhost:4200"}), (req, res, next) => {
   const result = req.body.reduce((total, current) => {
     var fritz = votes[current] !== undefined ? Object.values(votes[current]).reduce((sum, vote) => {
       return vote !== undefined ? sum + vote : sum;
     }, 0) : 0;
     total[current] = {
         total: fritz,
-        myVote: 1//votes[current] ? votes[current][req.cookies.voterID] : undefined
+        myVote: votes[current] !== undefined ? votes[current][req.cookies.voterID] : undefined
     };
     return total;
   }, {});
   res.send(result);
+  next()
 });
 
 module.exports = app;
