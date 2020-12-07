@@ -9,7 +9,7 @@ var https = require("node-fetch");
 var app = express();
 app.use(cookieParser());
 app.use(cors({ 
-  origin: 'http://localhost:4200', 
+  origin: 'http://bonenga.ddns.net:4200', 
   credentials: true, 
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   optionsSuccessStatus: 200
@@ -23,11 +23,11 @@ const ROOT_URL = "https://hacker-news.firebaseio.com/v0/";
 var topstories = {};
 var votes = {};
 
-https(ROOT_URL + "topstories.json?print=pretty")
+https(ROOT_URL + "topstories.json")
   .then((res) => res.json())
   .then((ids) => {
     ids.forEach((id) => {
-      https(ROOT_URL + `item/${id}.json?print=pretty`)
+      https(ROOT_URL + `item/${id}.json`)
         .then((res) => res.json())
         .then((story) => {
           topstories[story.id] = story;
@@ -48,7 +48,7 @@ https(ROOT_URL + "topstories.json?print=pretty")
 
   
 app.use(function(req, res, next) {
-  res.header("Access-Control-Allow-Origin", "http://localhost:4200");
+  res.header("Access-Control-Allow-Origin", "http://bonenga.ddns.net:4200");
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
   res.header("Access-Control-Allow-Headers", "application/x-www-form-urlencoded, multipart/form-data, text/plain, Origin, X-Requested-With, Content-Type, Accept, Cache-Control");
   res.header("Access-Control-Allow-Credentials", true);
@@ -113,6 +113,7 @@ app.get("/item/:id/resetvote", (req, res) => {
   res.send();
 });
 
+
 app.get("/votes", (req, res) => {
   res.send(votes);
   console.log(req.cookies);
@@ -120,11 +121,11 @@ app.get("/votes", (req, res) => {
 
 app.post("/votes", cors({ origin: "http://localhost:4200"}), (req, res, next) => {
   const result = req.body.reduce((total, current) => {
-    var fritz = votes[current] !== undefined ? Object.values(votes[current]).reduce((sum, vote) => {
+    var totalVotes = votes[current] !== undefined ? Object.values(votes[current]).reduce((sum, vote) => {
       return vote !== undefined ? sum + vote : sum;
     }, 0) : 0;
     total[current] = {
-        total: fritz,
+        total: totalVotes,
         myVote: votes[current] !== undefined ? votes[current][req.cookies.voterID] : undefined
     };
     return total;
